@@ -3,6 +3,7 @@ package controller
 import (
 	"binance/usecase"
 	"binance/utility"
+	"fmt"
 	"log"
 	"time"
 )
@@ -44,6 +45,6 @@ func (ctrl *CoinController) ProcessBinanceCandleStick(interval string, year int)
 
 	//Process into Spreadsheet -> write into folder
 	utility.FormatToSpreadsheet(report, interval, year)
-	log.Println("[ProcessBinanceCandleStick]Done")
+	log.Printf("[ProcessBinanceCandleStick] Done. File %s Created/Updated\n", fmt.Sprintf("Kline%dInterval%s.csv", year, interval))
 
 }
