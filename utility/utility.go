@@ -1,10 +1,12 @@
 package utility
 
 import (
+	"encoding/csv"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 
@@ -12,7 +14,34 @@ import (
 )
 
 //FormatToExcel Take data and return it into Spreadsheet
-func FormatToSpreadsheet() {}
+func FormatToSpreadsheet(report []float64, interval string, year int) {
+	f, err := os.Create(fmt.Sprintf("Kline%dInterval%s.csv", year, interval))
+	if err != nil {
+		fmt.Println("[Create]Err:", err)
+		return
+	}
+
+	writer := csv.NewWriter(f)
+	var data = [][]string{
+		{"Year", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "YTD"},
+	}
+	idx, yIndex := 0, 0
+	for idx < len(report)-1 {
+		line := []string{strconv.Itoa(year + yIndex)}
+		for i := 0; i <= 12; i++ {
+			line = append(line, fmt.Sprintf("%05.2f%%", report[idx]))
+			idx++
+		}
+
+		data = append(data, line)
+		yIndex++
+	}
+
+	err = writer.WriteAll(data)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
 
 //GetFromURL Get Data from URL return []CandleStickData
 func GetFromURL(url string) []CandleStickData {
@@ -92,8 +121,8 @@ func Max(a, b float64) float64 {
 	return b
 }
 
-//CalculateMargin Calculate the margin
-func CalculateMargin(today, one, three, six, twelve string) float64 {
+//CalculateMomentum Calculate the Momentum
+func CalculateMomentum(today, one, three, six, twelve string) float64 {
 	//Convert String to float
 	todayPrice, err := strconv.ParseFloat(today, 64)
 	if err != nil {

@@ -36,6 +36,6 @@ func (eth *ETHUSDC) GetAnnualData(interval string, start, end int64) []utility.C
 		url = fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&endTime=%d", constants.GET_CANDLESTICK_URL, eth.Name, interval, starting.OpenTimestamp, end*1000)
 		data = append(data, utility.GetFromURL(url)[1:]...) //delete the start otherwise duplicate of starting point
 	}
-	fmt.Println(url)
+
 	return data
 }

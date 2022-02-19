@@ -37,6 +37,5 @@ func (btc *BTCUSDC) GetAnnualData(interval string, start, end int64) []utility.C
 		data = append(data, utility.GetFromURL(url)[1:]...) //delete the start otherwise duplicate of starting point
 	}
 
-	fmt.Println(url)
 	return data
 }

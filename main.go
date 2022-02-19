@@ -4,7 +4,6 @@ import (
 	"binance/controller"
 	"binance/usecase"
 	"log"
-	"time"
 )
 
 func main() {
@@ -12,7 +11,7 @@ func main() {
 	ctrl := controller.InitController(uc)
 
 	log.Println("[Main] Starting Task")
-	interval := 24 * time.Hour
-	year := 2019
+	interval := "1d"
+	year := 2018
 	ctrl.ProcessBinanceCandleStick(interval, year)
 }
