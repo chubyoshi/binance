@@ -1,10 +1,18 @@
 package main
 
+import (
+	"binance/controller"
+	"binance/usecase"
+	"log"
+	"time"
+)
+
 func main() {
-	//Get Data from binance
+	uc := usecase.InitUsecase()
+	ctrl := controller.InitController(uc)
 
-	//Process Data
-
-	//Return in Excel File
-
+	log.Println("[Main] Starting Task")
+	interval := 24 * time.Hour
+	year := 2019
+	ctrl.ProcessBinanceCandleStick(interval, year)
 }
