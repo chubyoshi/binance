@@ -66,16 +66,35 @@ func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time)
 	idx := 12 //First 12 elements are used only for Momentum
 	idxf := 12
 	assetDollar := 1000.0
-	coin := ""
+	startYearAsset := assetDollar
 
 	//Loop every new month until the before the start of next year
 	for currentTime := start; currentTime.Before(endTime); {
 		newMonth := currentTime.AddDate(0, 1, 0).Unix()
 		startMonthDollar := assetDollar
-		highestMomentum, momentumPrice := 0.0, 0.0
 		buyPrice := 0.0
+		coin := ""
 
 		for BTCUSDT[idx].OpenTimestamp/1000 < newMonth {
+			//Hold and sell at the End of Following Day
+			switch coin {
+			case "ETH":
+				assetCoin := assetDollar / buyPrice //Buy at highest Momentum
+				buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Close, 64)
+				assetDollar = assetCoin * buyPrice //Sell at the end of following day
+			case "BTC":
+				assetCoin := assetDollar / buyPrice
+				buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Close, 64)
+				assetDollar = assetCoin * buyPrice
+			case "ETH US":
+				assetCoin := assetDollar / buyPrice
+				buyPrice, _ = strconv.ParseFloat(ETHUSDC[idxf].Close, 64)
+				assetDollar = assetCoin * buyPrice
+			case "BTC US":
+				assetCoin := assetDollar / buyPrice
+				buyPrice, _ = strconv.ParseFloat(BTCUSDC[idxf].Close, 64)
+				assetDollar = assetCoin * buyPrice
+			}
 
 			//Calculate Offensive
 			BTC := utility.CalculateMomentum(BTCUSDT[idx].Close, BTCUSDT[idx-1].Close, BTCUSDT[idx-3].Close, BTCUSDT[idx-6].Close, BTCUSDT[idx-12].Close)
@@ -88,13 +107,8 @@ func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time)
 				coin = "BTC"
 			} else {
 				momentum = ETH
-				buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Close, 64)
+				buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Close, 64)
 				coin = "ETH"
-			}
-
-			if highestMomentum < momentum {
-				highestMomentum = momentum
-				momentumPrice = buyPrice
 			}
 
 			//If negative use highest defensive
@@ -121,11 +135,6 @@ func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time)
 					buyPrice, _ = strconv.ParseFloat(ETHUSDC[idxf].Close, 64)
 					coin = "ETH US"
 				}
-
-				if highestMomentum < momentum {
-					highestMomentum = momentum
-					momentumPrice = buyPrice
-				}
 			}
 			// fmt.Printf("%d. Time:%s Momentum:%f\n", idx, time.Unix(BTCUSDT[idx].OpenTimestamp/1000, 0), total)
 			idx++
@@ -134,29 +143,12 @@ func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time)
 			}
 		}
 
-		//Hold and sell at the End of Month
-		switch coin {
-		case "ETH":
-			assetCoin := assetDollar / momentumPrice //Buy at highest Momentum
-			assetDollar = assetCoin * buyPrice       //Sell at the end of month
-		case "BTC":
-			assetCoin := assetDollar / momentumPrice
-			assetDollar = assetCoin * buyPrice
-		case "ETH US":
-			assetCoin := assetDollar / momentumPrice
-			assetDollar = assetCoin * buyPrice
-		case "BTC US":
-			assetCoin := assetDollar / momentumPrice
-			assetDollar = assetCoin * buyPrice
-		}
-
-		returns := (assetDollar - startMonthDollar) / startMonthDollar
+		returns := ((assetDollar - startMonthDollar) / startMonthDollar) * 100
 		report = append(report, returns)
 		annual += returns
-
 		currentTime = currentTime.AddDate(0, 1, 0)
 	}
-	report = append(report, annual)
+	report = append(report, ((assetDollar-startYearAsset)/startYearAsset)*100)
 
 	return report
 }
