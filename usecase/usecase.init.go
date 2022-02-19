@@ -62,7 +62,6 @@ func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time)
 	ETHUSDC := uc.ETHUSDC.GetAnnualData(interval, startTime.Unix(), endTime.Unix())
 
 	report := []float64{}
-	annual := 0.0
 	idx := 12 //First 12 elements are used only for Momentum
 	idxf := 12
 	assetDollar := 1000.0
@@ -145,7 +144,6 @@ func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time)
 
 		returns := ((assetDollar - startMonthDollar) / startMonthDollar) * 100
 		report = append(report, returns)
-		annual += returns
 		currentTime = currentTime.AddDate(0, 1, 0)
 	}
 	report = append(report, ((assetDollar-startYearAsset)/startYearAsset)*100)
