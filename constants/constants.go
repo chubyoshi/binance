@@ -10,5 +10,6 @@ var (
 
 //Binance Config
 var (
-	GET_CANDLESTICK_URL = "https://api2.binance.com/api/v3/klines?"
+	GET_CANDLESTICK_URL         = "https://api2.binance.com/api/v3/klines?"
+	CANDLESTICK_LOWEST_INTERVAL = "1m"
 )
