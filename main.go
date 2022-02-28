@@ -19,7 +19,7 @@ func main() {
 		fmt.Printf("Error Parsing int: %+v", err)
 	}
 
-	fmt.Print(`Enter Interval Period ("m", "h", "s", "d", "w", "M", "Y"): `)
+	fmt.Print(`Enter Interval Period ("m", "h", "s", "d", "w", "M"): `)
 	interval := "1d"
 	fmt.Scanln(&interval)
 
