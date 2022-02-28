@@ -27,7 +27,6 @@ func InitController(usecase usecase.UsecaseInterface) CoinInterface {
 
 //ProcessBinanceCandleStick Take Interval and start year. Get Data & process into spreadsheet from date to now
 func (ctrl *CoinController) ProcessBinanceCandleStick(interval string, year int, startingAsset float64) {
-
 	//Get Data report from binance
 	startDate := time.Date(year, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", 0)) //January 1 of selected year
 	report, err := ctrl.Usecase.GetBinanceReport(interval, startDate, startingAsset)

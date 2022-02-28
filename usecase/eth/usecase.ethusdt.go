@@ -4,38 +4,83 @@ import (
 	"binance/constants"
 	"binance/utility"
 	"fmt"
+	"strconv"
+	"time"
 )
 
-//ETHUSDTInterface Abstract Obj
+//ETHUSDTInterface Abstract Obj.
 type ETHUSDTInterface interface {
-	GetAnnualData(interval string, start, end int64) []utility.CandleStickData
+	GetInitialData(interval string, endDate time.Time) []utility.CandleStickData
+	GetData(start int64) utility.CandleStickData
 }
 
-//InitETHUSDT Initialize
+//InitETHUSDT Init Obj
 func InitETHUSDT(name string) ETHUSDTInterface {
 	return &ETHUSDT{
 		Name: name,
 	}
 }
 
-//GetAnnualData Get and Data on a yearly basis. Return data base on interval
-func (eth *ETHUSDT) GetAnnualData(interval string, start, end int64) []utility.CandleStickData {
-	//Get Data from Binance. Binance LIMIT, Default = 500, Max = 1000
-	url := fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&endTime=%d", constants.GET_CANDLESTICK_URL, eth.Name, interval, start*1000, end*1000)
+//GetInitialData Get the initial data for momentum counting
+func (eth *ETHUSDT) GetInitialData(interval string, endDate time.Time) []utility.CandleStickData {
+	var duration time.Duration
+	var durationInt int
+	var err error
+	intervalFormat := interval[len(interval)-1:]
 
-	//Get data until end of year period
-	data := utility.GetFromURL(url)
-	if data == nil {
-		//Error
+	switch intervalFormat {
+	case "h", "m", "s":
+		duration, err = time.ParseDuration(interval)
+		if err != nil {
+			return nil
+		}
+	case "d", "w", "M":
+		durationInt, err = strconv.Atoi(interval[:len(interval)-1])
+		if err != nil {
+			return nil
+		}
+	default:
 		return nil
 	}
 
-	for data[len(data)-1].OpenTimestamp/1000 != end {
-		starting := data[len(data)-1]
-
-		url = fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&endTime=%d", constants.GET_CANDLESTICK_URL, eth.Name, interval, starting.OpenTimestamp, end*1000)
-		data = append(data, utility.GetFromURL(url)[1:]...) //delete the start otherwise duplicate of starting point
+	var startDate time.Time
+	switch intervalFormat {
+	case "m", "h", "s":
+		startDate = endDate.Add(-12 * duration)
+	case "d":
+		startDate = endDate.AddDate(0, 0, -12*durationInt)
+	case "w":
+		startDate = endDate.AddDate(0, 0, -12*durationInt*7)
+	case "M":
+		startDate = endDate.AddDate(0, -12*durationInt, 0)
 	}
 
-	return data
+	//Get data prior to endDate
+	result := []utility.CandleStickData{}
+	for i := 0; i < 13; i++ {
+		result = append(result, eth.GetData(startDate.Unix()))
+
+		switch intervalFormat {
+		case "m", "h", "s":
+			startDate = startDate.Add(duration)
+		case "d":
+			startDate = startDate.AddDate(0, 0, durationInt)
+		case "w":
+			startDate = startDate.AddDate(0, 0, durationInt*7)
+		case "M":
+			startDate = startDate.AddDate(0, durationInt, 0)
+		}
+
+	}
+	return result
+}
+
+//GetData Get Data on that timestamp
+func (eth *ETHUSDT) GetData(start int64) utility.CandleStickData {
+	url := fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&limit=%d", constants.GET_CANDLESTICK_URL, eth.Name, constants.CANDLESTICK_LOWEST_INTERVAL, start*1000, 5)
+
+	//Get data until end of year period
+	data := utility.GetFromURL(url)
+
+	return data[0]
 }

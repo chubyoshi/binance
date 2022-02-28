@@ -37,7 +37,7 @@ func (uc *UsecaseStruct) GetBinanceReport(interval string, start time.Time, init
 		if err != nil {
 			return nil, fmt.Errorf("error interval format %s. Err: %v\n", interval, err)
 		}
-	case "d", "w", "M", "Y":
+	case "d", "w", "M":
 		durationInt, err = strconv.Atoi(interval[:len(interval)-1])
 		if err != nil {
 			return nil, fmt.Errorf("error interval format %s. Err: %v\n", interval, err)
@@ -47,8 +47,8 @@ func (uc *UsecaseStruct) GetBinanceReport(interval string, start time.Time, init
 	}
 
 	//Get Offensive Coin 12 interval data prior for momentum counting
-	BTCUSDT := uc.BTCUSDT.GetInitialData(interval, start.Unix())
-	ETHUSDT := uc.ETHUSDT.GetInitialData(interval, start.Unix())
+	BTCUSDT := uc.BTCUSDT.GetInitialData(interval, start)
+	ETHUSDT := uc.ETHUSDT.GetInitialData(interval, start)
 
 	//Validate Initial data
 	if BTCUSDT == nil || ETHUSDT == nil {
@@ -56,22 +56,24 @@ func (uc *UsecaseStruct) GetBinanceReport(interval string, start time.Time, init
 	}
 
 	monthly, yearly := start.AddDate(0, 1, 0), start.AddDate(1, 0, 0)
-	initialMonthly, initialYearly := initialMoney, initialMoney
+	initialMonthly, initialYearly, assetMoney := initialMoney, initialMoney, initialMoney
 	report := []float64{}
-	var assetMoney, assetCoin, buyPrice float64
+	var assetCoin, buyPrice float64
 	var coinName string
 	idx := 12 //First 12 elements are used only for Momentum which is the size of each coin slices
 	for i := start; i.Before(time.Now()); {
 		//Get Data from Binance for the offensive coin goroutine until all coins data get
+		BTCUSDT = append(BTCUSDT, uc.BTCUSDT.GetData(i.Unix()))
+		ETHUSDT = append(ETHUSDT, uc.ETHUSDT.GetData(i.Unix()))
 
-		if i.After(monthly) {
+		if i.After(monthly) || i.Equal(monthly) {
 			percentage := ((assetMoney - initialMonthly) / initialMonthly) * 100
 			report = append(report, percentage)
 			initialMonthly = assetMoney
 			monthly = monthly.AddDate(0, 1, 0)
 		}
 
-		if i.After(yearly) {
+		if i.After(yearly) || i.Equal(yearly) {
 			percentage := ((assetMoney - initialYearly) / initialYearly) * 100
 			report = append(report, percentage)
 			initialYearly = assetMoney
@@ -81,7 +83,7 @@ func (uc *UsecaseStruct) GetBinanceReport(interval string, start time.Time, init
 		//Selling the Coin at Open Price the next interval, if empty don't = momentum < 0 so just hold until momentum is positive
 		switch coinName {
 		case "BTCUSDT":
-			buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Open, 64)
+			buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Open, 64)
 			assetMoney = assetCoin * buyPrice
 		case "ETHUSDT":
 			buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Open, 64)
@@ -92,6 +94,10 @@ func (uc *UsecaseStruct) GetBinanceReport(interval string, start time.Time, init
 		//Finding Momentum of each offensive coin
 		btcusdtMomentum := utility.CalculateMomentum(BTCUSDT[idx].Open, BTCUSDT[idx-1].Open, BTCUSDT[idx-3].Open, BTCUSDT[idx-6].Open, BTCUSDT[idx-12].Open)
 		ethusdtMomentum := utility.CalculateMomentum(ETHUSDT[idx].Open, ETHUSDT[idx-1].Open, ETHUSDT[idx-3].Open, ETHUSDT[idx-6].Open, ETHUSDT[idx-12].Open)
+
+		//Remove the first data from offensive coin to, so memory isn't that much
+		BTCUSDT = BTCUSDT[1:]
+		ETHUSDT = ETHUSDT[1:]
 
 		//Finding which coin to buy, by the maximum momentum
 		momentum := 0.0
@@ -115,17 +121,14 @@ func (uc *UsecaseStruct) GetBinanceReport(interval string, start time.Time, init
 		//Append time based on interval
 		switch intervalFormat {
 		case "m", "h", "s":
-			i.Add(duration)
+			i = i.Add(duration)
 		case "d":
-			i.AddDate(0, 0, durationInt)
+			i = i.AddDate(0, 0, durationInt)
 		case "w":
-			i.AddDate(0, 0, durationInt*7)
+			i = i.AddDate(0, 0, durationInt*7)
 		case "M":
-			i.AddDate(0, durationInt, 0)
-		case "Y":
-			i.AddDate(durationInt, 0, 0)
+			i = i.AddDate(0, durationInt, 0)
 		}
 	}
-
 	return report, nil
 }

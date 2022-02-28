@@ -23,7 +23,7 @@ func main() {
 	interval := "1d"
 	fmt.Scanln(&interval)
 
-	fmt.Print("Enter start Year: ")
+	fmt.Print("Enter starting Asset: ")
 	fmt.Scanln(&scan)
 	assets, err := strconv.ParseFloat(scan, 64)
 	if err != nil {

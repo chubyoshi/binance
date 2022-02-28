@@ -4,11 +4,14 @@ import (
 	"binance/constants"
 	"binance/utility"
 	"fmt"
+	"log"
+	"strconv"
+	"time"
 )
 
 //BTCUSDTInterface Abstract Obj.
 type BTCUSDTInterface interface {
-	GetInitialData(interval string, endDate int64) []utility.CandleStickData
+	GetInitialData(interval string, endDate time.Time) []utility.CandleStickData
 	GetData(start int64) utility.CandleStickData
 }
 
@@ -19,40 +22,69 @@ func InitBTCUSDT(name string) BTCUSDTInterface {
 	}
 }
 
-func (btc *BTCUSDT) GetInitialData(interval string, endDate int64) []utility.CandleStickData {
-	//Get Data from Binance. Binance LIMIT, Default = 500, Max = 1000
-	url := fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&endTime=%d", constants.GET_CANDLESTICK_URL, btc.Name, interval, start*1000, end*1000)
+//GetInitialData Get the initial data for momentum counting
+func (btc *BTCUSDT) GetInitialData(interval string, endDate time.Time) []utility.CandleStickData {
+	var duration time.Duration
+	var durationInt int
+	var err error
+	intervalFormat := interval[len(interval)-1:]
+
+	switch intervalFormat {
+	case "h", "m", "s":
+		duration, err = time.ParseDuration(interval)
+		if err != nil {
+			return nil
+		}
+	case "d", "w", "M":
+		durationInt, err = strconv.Atoi(interval[:len(interval)-1])
+		if err != nil {
+			return nil
+		}
+	default:
+		return nil
+	}
+
+	var startDate time.Time
+	switch intervalFormat {
+	case "m", "h", "s":
+		startDate = endDate.Add(-12 * duration)
+	case "d":
+		startDate = endDate.AddDate(0, 0, -12*durationInt)
+	case "w":
+		startDate = endDate.AddDate(0, 0, -12*durationInt*7)
+	case "M":
+		startDate = endDate.AddDate(0, -12*durationInt, 0)
+	}
 
 	//Get data prior to endDate
 	result := []utility.CandleStickData{}
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 13; i++ {
+		result = append(result, btc.GetData(startDate.Unix()))
+
+		switch intervalFormat {
+		case "m", "h", "s":
+			startDate = startDate.Add(duration)
+		case "d":
+			startDate = startDate.AddDate(0, 0, durationInt)
+		case "w":
+			startDate = startDate.AddDate(0, 0, durationInt*7)
+		case "M":
+			startDate = startDate.AddDate(0, durationInt, 0)
+		}
 
 	}
-	data := utility.GetFromURL(url)
-	if data == nil {
-		return nil
-	}
-	if len(data) < 13 {
-		return nil
-	}
-
+	return result
 }
 
-//GetAnnualData Get and Data on a yearly basis. Return data base on interval
+//GetData Get Data on that timestamp
 func (btc *BTCUSDT) GetData(start int64) utility.CandleStickData {
-	url := fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&limit=%d", constants.GET_CANDLESTICK_URL, btc.Name, interval, start*1000, 5)
+	url := fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&limit=%d", constants.GET_CANDLESTICK_URL, btc.Name, constants.CANDLESTICK_LOWEST_INTERVAL, start*1000, 5)
 
 	//Get data until end of year period
 	data := utility.GetFromURL(url)
-	if data == nil {
-		return nil
+	if len(data) == 0 {
+		log.Printf("GetData Data:%d, ts:%d, url:%s\n", len(data), start, url)
 	}
 
-	for data[len(data)-1].OpenTimestamp/1000 != end {
-		starting := data[len(data)-1]
-
-		url = fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&endTime=%d", constants.GET_CANDLESTICK_URL, btc.Name, interval, starting.OpenTimestamp, end*1000)
-		data = append(data, utility.GetFromURL(url)[1:]...) //delete the start otherwise duplicate of starting point
-	}
 	return data[0]
 }
