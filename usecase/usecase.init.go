@@ -12,141 +12,137 @@ import (
 
 //UsecaseInterface Abstract Object
 type UsecaseInterface interface {
-	GetAnnualDataMomentum(interval string, start time.Time) []float64
+	GetAnnualDataMomentum(interval string, start time.Time, assetDollar float64) ([]float64, float64)
 }
 
 //InitUsecase Initialize Usecase
 func InitUsecase() UsecaseInterface {
 	return &UsecaseStruct{
-		BTCUSDC: btc.InitBTCUSDC(constants.BTCUSDC),
 		BTCUSDT: btc.InitBTCUSDT(constants.BTCUSDT),
-		ETHUSDC: eth.InitETHUSDC(constants.ETHUSDC),
 		ETHUSDT: eth.InitETHUSDT(constants.ETHUSDT),
 	}
 }
 
 //GetAnnualDataMomentum Get Data from start with interval. return Monthly Momentum for that year
-func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time) []float64 {
-	//end = current year however there's a limit of 1000. TODO validation limit for other interval
+func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time, assetDollar float64) ([]float64, float64) {
 	//Acceptable Interval: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
 	var startTime time.Time
-	switch interval[len(interval)-1:] {
+	switchInterval := interval[len(interval)-1:]
+	var duration time.Duration
+	var err error
+	var durationInt int
+	// set startTime = start - 13 interval time (12 for findingthe  momentum, 13 = data at now)
+	switch switchInterval {
 	case "m", "h":
-		duration, err := time.ParseDuration(interval)
+		duration, err = time.ParseDuration(interval)
 		if err != nil {
 			log.Printf("Error Interval %s, Err: %+v\n", interval, err)
-			return nil
+			return nil, assetDollar
 		}
-		startTime.Add(-13 * duration)
+		startTime.Add(-12 * duration)
 	case "d":
-		duration, err := strconv.Atoi(interval[:len(interval)-1])
+		durationInt, err = strconv.Atoi(interval[:len(interval)-1])
 		if err != nil {
 			log.Printf("Error Atoi %s, Err: %+v\n", interval[:len(interval)-1], err)
-			return nil
+			return nil, assetDollar
 		}
-		startTime = start.AddDate(0, 0, duration-13)
+		startTime = start.AddDate(0, 0, -12*durationInt)
 	case "w":
-		startTime = start.AddDate(0, 0, -91) //91 = 7d * 13
+		durationInt, err = strconv.Atoi(interval[:len(interval)-1])
+		if err != nil {
+			log.Printf("Error Atoi %s, Err: %+v\n", interval[:len(interval)-1], err)
+			return nil, assetDollar
+		}
+		startTime = start.AddDate(0, 0, -12*durationInt*7)
 	case "M":
-		startTime = start.AddDate(0, -13, 0)
+		startTime = start.AddDate(0, -12, 0)
 	default:
 		log.Printf("Error Interval %s\n", interval)
-		return nil
+		return nil, assetDollar
 	}
 	endTime := start.AddDate(1, 0, 0)
+	if endTime.After(time.Now()) {
+		y, m, d := time.Now().Date()
+		endTime = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	}
 
-	//Get Yearly Data
+	//Get Offensive Coin
 	BTCUSDT := uc.BTCUSDT.GetAnnualData(interval, startTime.Unix(), endTime.Unix())
-	BTCUSDC := uc.BTCUSDC.GetAnnualData(interval, startTime.Unix(), endTime.Unix())
 	ETHUSDT := uc.ETHUSDT.GetAnnualData(interval, startTime.Unix(), endTime.Unix())
-	ETHUSDC := uc.ETHUSDC.GetAnnualData(interval, startTime.Unix(), endTime.Unix())
 
-	report := []float64{}
+	//Loop every new month and append monthly return
 	idx := 12 //First 12 elements are used only for Momentum
-	idxf := 12
-	assetDollar := 1000.0
+	report := []float64{}
+	assetCoin := 0.0
+	coinName := ""
+	buyPrice := 0.0
+	reportIdx := 0
+
 	startYearAsset := assetDollar
-
-	//Loop every new month until the before the start of next year
-	for currentTime := start; currentTime.Before(endTime); {
-		newMonth := currentTime.AddDate(0, 1, 0).Unix()
+	currentTime := start
+	for currentTime.Before(endTime) && !currentTime.Equal(endTime) {
+		newMonth := currentTime.AddDate(0, 1, 0)
 		startMonthDollar := assetDollar
-		buyPrice := 0.0
-		coin := ""
+		// fmt.Println(idx, currentTime, time.Unix(BTCUSDT[idx].OpenTimestamp/1000, 0), endTime, BTCUSDT[idx].OpenTimestamp)
 
-		for BTCUSDT[idx].OpenTimestamp/1000 < newMonth {
-			//Hold and sell at the End of Following Day
-			switch coin {
-			case "ETH":
-				assetCoin := assetDollar / buyPrice //Buy at highest Momentum
+		for currentTime.Before(newMonth) {
+			//Sell at the End of Following Day
+			switch coinName {
+			case "ETHUSDT":
 				buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Close, 64)
 				assetDollar = assetCoin * buyPrice //Sell at the end of following day
-			case "BTC":
-				assetCoin := assetDollar / buyPrice
+			case "BTCUSDT":
 				buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Close, 64)
 				assetDollar = assetCoin * buyPrice
-			case "ETH US":
-				assetCoin := assetDollar / buyPrice
-				buyPrice, _ = strconv.ParseFloat(ETHUSDC[idxf].Close, 64)
-				assetDollar = assetCoin * buyPrice
-			case "BTC US":
-				assetCoin := assetDollar / buyPrice
-				buyPrice, _ = strconv.ParseFloat(BTCUSDC[idxf].Close, 64)
-				assetDollar = assetCoin * buyPrice
+			case "": //Skip
 			}
 
-			//Calculate Offensive
-			BTC := utility.CalculateMomentum(BTCUSDT[idx].Close, BTCUSDT[idx-1].Close, BTCUSDT[idx-3].Close, BTCUSDT[idx-6].Close, BTCUSDT[idx-12].Close)
-			ETH := utility.CalculateMomentum(ETHUSDT[idx].Close, ETHUSDT[idx-1].Close, ETHUSDT[idx-3].Close, ETHUSDT[idx-6].Close, ETHUSDT[idx-12].Close)
+			//Calculate Offensive Momentum
+			btcusdtMomentum := utility.CalculateMomentum(BTCUSDT[idx].Open, BTCUSDT[idx-1].Open, BTCUSDT[idx-3].Open, BTCUSDT[idx-6].Open, BTCUSDT[idx-12].Open)
+			ethusdtMomentum := utility.CalculateMomentum(ETHUSDT[idx].Open, ETHUSDT[idx-1].Open, ETHUSDT[idx-3].Open, ETHUSDT[idx-6].Open, ETHUSDT[idx-12].Open)
 			momentum := 0.0
 
-			if BTC > ETH {
-				momentum = BTC
-				buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Close, 64)
-				coin = "BTC"
-			} else {
-				momentum = ETH
-				buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Close, 64)
-				coin = "ETH"
+			//Can be turned into a function
+			if btcusdtMomentum > ethusdtMomentum {
+				momentum = btcusdtMomentum
+				buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Open, 64)
+				coinName = "BTCUSDT"
+			} else if ethusdtMomentum > btcusdtMomentum {
+				momentum = ethusdtMomentum
+				buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Open, 64)
+				coinName = "ETHUSDT"
 			}
 
-			//If negative use highest defensive
-			flag := BTCUSDC[idxf].OpenTimestamp == BTCUSDT[idx].OpenTimestamp
+			//If momentum is negative don't buy
 			if momentum < 0 {
-				//If No Defensive Option
-				if flag {
-					// fmt.Println(time.Unix(BTCUSDC[idxf].OpenTimestamp/1000, 0), time.Unix(BTCUSDC[idxf].OpenTimestamp/1000, 0), idxf, idx)
-					idx++
-					idxf++
-					continue
-				}
-
-				//Calculate Max Defensive
-				BTCUS := utility.CalculateMomentum(BTCUSDC[idxf].Close, BTCUSDC[idxf-1].Close, BTCUSDC[idxf-3].Close, BTCUSDC[idxf-6].Close, BTCUSDC[idxf-12].Close)
-				ETHUS := utility.CalculateMomentum(ETHUSDC[idxf].Close, ETHUSDC[idxf-1].Close, ETHUSDC[idxf-3].Close, ETHUSDC[idxf-6].Close, ETHUSDC[idxf-12].Close)
-
-				if BTCUS > ETHUS {
-					momentum = BTCUS
-					buyPrice, _ = strconv.ParseFloat(BTCUSDC[idxf].Close, 64)
-					coin = "BTC US"
-				} else {
-					momentum = ETHUS
-					buyPrice, _ = strconv.ParseFloat(ETHUSDC[idxf].Close, 64)
-					coin = "ETH US"
-				}
+				coinName = ""
+			} else {
+				assetCoin = assetDollar / buyPrice
 			}
-			// fmt.Printf("%d. Time:%s Momentum:%f\n", idx, time.Unix(BTCUSDT[idx].OpenTimestamp/1000, 0), total)
 			idx++
-			if flag {
-				idxf++
+
+			switch switchInterval {
+			case "m", "h":
+				currentTime = currentTime.Add(duration)
+			case "d":
+				currentTime = currentTime.AddDate(0, 0, durationInt)
+			case "w":
+				currentTime = currentTime.AddDate(0, 0, durationInt*7)
+			case "M":
+				currentTime = currentTime.AddDate(0, durationInt, 0)
 			}
 		}
-
+		// fmt.Println(currentTime.Month(), currentTime, currentTime.Equal(endTime))
+		//Monthly Returns
 		returns := ((assetDollar - startMonthDollar) / startMonthDollar) * 100
 		report = append(report, returns)
-		currentTime = currentTime.AddDate(0, 1, 0)
+		reportIdx++
+	}
+
+	//Yearly Returns
+	for i := reportIdx; i < 12; i++ {
+		report = append(report, 0.0)
 	}
 	report = append(report, ((assetDollar-startYearAsset)/startYearAsset)*100)
-
-	return report
+	return report, assetDollar
 }

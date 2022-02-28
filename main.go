@@ -3,15 +3,34 @@ package main
 import (
 	"binance/controller"
 	"binance/usecase"
+	"fmt"
 	"log"
+	"strconv"
 )
 
 func main() {
+	log.Println("[Main] Starting Task")
+
+	scan := ""
+	fmt.Print("Enter start Year: ")
+	fmt.Scanln(&scan)
+	year, err := strconv.Atoi(scan)
+	if err != nil {
+		fmt.Printf("Error Parsing int: %+v", err)
+	}
+
+	fmt.Print(`Enter Interval Period ("m", "h", "s", "d", "w", "M"): `)
+	interval := "1d"
+	fmt.Scanln(&interval)
+
+	fmt.Print("Enter starting Asset: ")
+	fmt.Scanln(&scan)
+	assets, err := strconv.ParseFloat(scan, 64)
+	if err != nil {
+		fmt.Printf("Error Parsing float64: %+v", err)
+	}
+
 	uc := usecase.InitUsecase()
 	ctrl := controller.InitController(uc)
-
-	log.Println("[Main] Starting Task")
-	interval := "1d"
-	year := 2018
-	ctrl.ProcessBinanceCandleStick(interval, year)
+	ctrl.ProcessBinanceCandleStick(interval, year, assets)
 }

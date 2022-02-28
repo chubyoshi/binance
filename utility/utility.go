@@ -25,16 +25,14 @@ func FormatToSpreadsheet(report []float64, interval string, year int) {
 	var data = [][]string{
 		{"Year", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "YTD"},
 	}
-	idx, yIndex := 0, 0
-	for idx < len(report)-1 {
-		line := []string{strconv.Itoa(year + yIndex)}
-		for i := 0; i <= 12; i++ {
+	idx := 0
+	for i := 0; idx < len(report); i++ {
+		line := []string{strconv.Itoa(year + i)}
+		for j := 0; j <= 12; j++ {
 			line = append(line, fmt.Sprintf("%05.2f%%", report[idx]))
 			idx++
 		}
-
 		data = append(data, line)
-		yIndex++
 	}
 
 	err = writer.WriteAll(data)
