@@ -89,10 +89,10 @@ func (uc *UsecaseStruct) GetAnnualDataMomentum(interval string, start time.Time,
 			//Sell at the End of Following Day
 			switch coinName {
 			case "ETHUSDT":
-				buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Close, 64)
+				buyPrice, _ = strconv.ParseFloat(ETHUSDT[idx].Open, 64)
 				assetDollar = assetCoin * buyPrice //Sell at the end of following day
 			case "BTCUSDT":
-				buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Close, 64)
+				buyPrice, _ = strconv.ParseFloat(BTCUSDT[idx].Open, 64)
 				assetDollar = assetCoin * buyPrice
 			case "": //Skip
 			}
