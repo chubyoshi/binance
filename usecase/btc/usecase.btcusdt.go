@@ -28,13 +28,11 @@ func (btc *BTCUSDT) GetAnnualData(interval string, start, end int64) []utility.C
 		return nil
 	}
 
-	fmt.Println("Length")
-	for data[len(data)-1].OpenTimestamp/1000 != end {
+	for data[len(data)-1].OpenTimestamp/1000 < end {
 		starting := data[len(data)-1]
 
 		url = fmt.Sprintf("%ssymbol=%s&interval=%s&startTime=%d&endTime=%d", constants.GET_CANDLESTICK_URL, btc.Name, interval, starting.OpenTimestamp, end*1000)
 		data = append(data, utility.GetFromURL(url)[1:]...) //delete the start otherwise duplicate of starting point
-		fmt.Println(url)
 	}
 	return data
 }
